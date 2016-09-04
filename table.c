@@ -49,7 +49,7 @@ static size_t next_prime_size(size_t cur_size, float scalar);
 static size_t next_prime_step(size_t cur_size);
 static unsigned long table_hash(void *k, size_t len);
 static int table_cmp(void *k1, void *k2, size_t len);
-static int internal_search(table_t t, void *key, size_t keylen);
+static ssize_t internal_search(table_t t, void *key, size_t keylen);
 static int grow_table(table_t t);
 
 static int table_cmp(void *k1, void *k2, size_t len)
@@ -215,7 +215,7 @@ int table_insert(table_t t, void *key, size_t keylen, void *data)
     return 0;
 }
 
-static int internal_search(table_t t, void *key, size_t keylen)
+static ssize_t internal_search(table_t t, void *key, size_t keylen)
 {
     struct table *ta = t;
     struct entry *e = NULL;
@@ -267,7 +267,7 @@ static int internal_search(table_t t, void *key, size_t keylen)
 int table_get(table_t t, void *key, size_t keylen, void **data_ptr)
 {
     struct table *ta = t;
-    int pos = internal_search(t, key, keylen);
+    ssize_t pos = internal_search(t, key, keylen);
 
     if(pos > 0) {
         *data_ptr = ta->table[pos].data;
@@ -282,7 +282,7 @@ int table_get(table_t t, void *key, size_t keylen, void **data_ptr)
 void *table_remove(table_t t, void *key, size_t keylen)
 {
     struct table *ta = t;
-    int pos = internal_search(t, key, keylen);
+    ssize_t pos = internal_search(t, key, keylen);
 
     if(pos > 0) {
         ta->table[pos].alive = 0;
