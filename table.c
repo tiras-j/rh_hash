@@ -127,6 +127,8 @@ static int grow_table(table_t t)
             table_insert(t, old_table[i].key, old_table[i].keylen, old_table[i].data);
         }
     }
+
+    free(old_table);
     return 0;
 }
 /* table_new generates a new table at the default size
