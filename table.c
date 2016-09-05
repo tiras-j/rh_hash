@@ -8,8 +8,8 @@
 
 #include "table.h"
 
-//#define TABLE_SIZE_DEFAULT 547
-#define TABLE_SIZE_DEFAULT 10007
+#define TABLE_SIZE_DEFAULT 547
+#define TABLE_MAX_LOAD_FACTOR 0.9
 
 #define MAX(a,b) \
     ({ __typeof__ (a) _a = (a); \
@@ -52,11 +52,14 @@ static int table_cmp(void *k1, void *k2, size_t len);
 static ssize_t internal_search(table_t t, void *key, size_t keylen);
 static int grow_table(table_t t);
 
+/* Wrapper to cast the keys for compare */
 static int table_cmp(void *k1, void *k2, size_t len)
 {
     return strncmp((const char *)k1, (const char *)k2, len);
 }
-/* Type checking needs to be done before 
+
+/* Type checking needs to be done before
+ * Simple djb2 hash 
  */
 static unsigned long table_hash(void *k, size_t len)
 {
@@ -68,6 +71,11 @@ static unsigned long table_hash(void *k, size_t len)
     return hash;
 }
 
+/* Very simple primality test. 
+ * We scale the size by some scalar and then
+ * walk up until we find the next prime to use
+ * as the table size 
+ */
 static int is_prime(size_t n) {
     int i = 5;
     if(n <= 1)
@@ -84,6 +92,7 @@ static int is_prime(size_t n) {
     return 1;
 }
 
+/* Walk to higher numbers to ensure the size is >= requested */
 static size_t next_prime_size(size_t cur_size, float scalar)
 {
     size_t new_size = cur_size * scalar;
@@ -93,6 +102,9 @@ static size_t next_prime_size(size_t cur_size, float scalar)
     return new_size;
 }
 
+/* Walk downwards to ensure the size of the step is
+ * less than the table size
+ */
 static size_t next_prime_step(size_t cur_size)
 {
     size_t new_step = cur_size - 1;
@@ -101,6 +113,9 @@ static size_t next_prime_step(size_t cur_size)
     return new_step;
 }
 
+/* Grow the table by 2.5 times to the next closest
+ * prime above cur_size * 2.5
+ */
 static int grow_table(table_t t)
 {
     float scalar = 2.5;
@@ -108,6 +123,7 @@ static int grow_table(table_t t)
     struct entry *old_table = ta->table;
     size_t new_size = next_prime_size(ta->size, scalar), old_size = ta->size;
     int i = 0;
+
     ta->table = calloc(new_size, sizeof(*ta->table));
     if(!ta->table) {
         ta->table = old_table;
@@ -131,6 +147,7 @@ static int grow_table(table_t t)
     free(old_table);
     return 0;
 }
+
 /* table_new generates a new table at the default size
  * it takes optionally a hashing function and a compare
  * function. By default it uses string keys and double hashing
@@ -167,7 +184,6 @@ int table_insert(table_t t, void *key, size_t keylen, void *data)
     struct table *ta = t;
     struct entry *e = NULL, r;
     unsigned long step;
-    ssize_t pos = -1;
 
     r.hash = ta->hash(key, keylen);
     r.key = key;
@@ -181,14 +197,12 @@ int table_insert(table_t t, void *key, size_t keylen, void *data)
     if(ta->elements == ta->size)
         return -1;
 
-    if((float)ta->elements/(float)ta->size > 0.9)
+    if((float)ta->elements/(float)ta->size > TABLE_MAX_LOAD_FACTOR)
         grow_table(t);
 
     for(;;) {
         r.probepos++;
         ta->totalweight++;
-
-        pos = (r.hash + r.probepos * step) % ta->size;
 
         e = &ta->table[(r.hash + r.probepos * step) % ta->size];
         if(!e->alive) {
@@ -207,9 +221,6 @@ int table_insert(table_t t, void *key, size_t keylen, void *data)
             }
         }
     }
-
-    // set the element
-    memcpy(e, &r, sizeof(struct entry));
 
     ta->elements++;
     ta->maxprobe = MAX(r.probepos, ta->maxprobe);
