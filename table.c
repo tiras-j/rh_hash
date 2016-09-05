@@ -304,3 +304,24 @@ void *table_remove(table_t t, void *key, size_t keylen)
         return NULL;
     }
 }
+
+/* Iterate over the table, invoking provided function with
+ * key, keylen, data, and arg
+ */
+int table_iter(table_t t, iter_func f, void *arg)
+{
+    struct table *ta = t;
+    size_t pos = 0;
+    struct entry *e = NULL;
+    int ret = 0;
+
+    for(; pos < ta->size; pos++) {
+        e = &ta->table[pos];
+        if(e->alive) {
+            if((ret = f(arg, e->key, e->keylen, e->data) != 0))
+                break;
+        }
+    }
+
+    return ret;
+}
