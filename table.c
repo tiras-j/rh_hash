@@ -232,7 +232,7 @@ int table_insert(table_t t, void *key, size_t keylen, void *data)
                 memcpy(&r, &temp, sizeof(struct entry));
                 // Reset step for new record
                 step = ta->step_prime - (r.hash % ta->step_prime);
-            } else if(!strncmp(r.key, e->key, r.keylen)) {
+            } else if(e->probepos == r.probepos && r.hash == e->hash && !strncmp(r.key, e->key, r.keylen)) {
                 // The key already exists, simply update the value
                 e->data = r.data;
                 // Exit early because in this case we don't want to 
