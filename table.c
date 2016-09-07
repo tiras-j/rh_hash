@@ -216,7 +216,7 @@ int table_insert(table_t t, void *key, size_t keylen, void *data)
                 if(pos != -1) {
                     memcpy(e, &r, sizeof(struct entry));
                     ta->table[pos].alive = 0;
-                    ta->totalweight -= (ta->table[pos].probepos - r.probepos);
+                    ta->totalweight -= ta->table[pos].probepos;
                     return 0;
                 }
             }
