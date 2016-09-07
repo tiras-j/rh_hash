@@ -218,6 +218,12 @@ int table_insert(table_t t, void *key, size_t keylen, void *data)
                 memcpy(&r, &temp, sizeof(struct entry));
                 // Reset step for new record
                 step = ta->step_prime - (r.hash % ta->step_prime);
+            } else if(!strncmp(r.key, e->key, r.keylen)) {
+                // The key already exists, simply update the value
+                e->data = r.data;
+                // Exit early because in this case we don't want to 
+                // update the element count or maxprobe
+                return 0;
             }
         }
     }
@@ -291,14 +297,40 @@ int table_get(table_t t, void *key, size_t keylen, void **data_ptr)
     }
 }
 
-/* Remove an item. Simply set alive = 0  and return pointer */
-void *table_remove(table_t t, void *key, size_t keylen)
+/* Remove an item. Simply set alive = 0 */
+int table_remove(table_t t, void *key, size_t keylen)
 {
     struct table *ta = t;
     ssize_t pos = internal_search(t, key, keylen);
 
     if(pos > 0) {
         ta->table[pos].alive = 0;
+        return 0;
+    } else {
+        return -1;
+    }
+}
+
+/* Fetch key pointer */
+void *table_fetch_key(table_t t, void *key, size_t keylen)
+{
+    struct table *ta = t;
+    ssize_t pos = internal_search(t, key, keylen);
+
+    if(pos > 0) {
+        return ta->table[pos].key;
+    } else {
+        return NULL;
+    }
+}
+
+/* Fetch data pointer */
+void *table_fetch_val(table_t t, void *key, size_t keylen)
+{
+    struct table *ta = t;
+    ssize_t pos = internal_search(t, key, keylen);
+
+    if(pos > 0) {
         return ta->table[pos].data;
     } else {
         return NULL;

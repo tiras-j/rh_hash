@@ -15,8 +15,11 @@ int table_insert(table_t, void *key, size_t keylen, void *data);
 
 int table_get(table_t, void *key, size_t keylen, void **dataptr);
 
-void *table_remove(table_t, void *key, size_t keylen);
+int table_remove(table_t, void *key, size_t keylen);
 
 int table_iter(table_t, iter_func, void*);
+
+void *table_fetch_key(table_t, void *key, size_t keylen);
+void *table_fetch_val(table_t, void *key, size_t keylen);
 
 #endif
