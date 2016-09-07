@@ -206,6 +206,20 @@ int table_insert(table_t t, void *key, size_t keylen, void *data)
 
         e = &ta->table[(r.hash + r.probepos * step) % ta->size];
         if(!e->alive) {
+            if(e->key) {
+                // If we are using a recycled position to insert, we first 
+                // need to check that this key isn't alive further down the
+                // probe sequence (i.e. the recycled position opened up between
+                // the first insert and this one for this key). If we find the key
+                // we should clear it and decrement the table totalweight appropriately
+                ssize_t pos = internal_search(t, r.key, r.keylen);
+                if(pos != -1) {
+                    memcpy(e, &r, sizeof(struct entry));
+                    ta->table[pos].alive = 0;
+                    ta->totalweight -= (ta->table[pos].probepos - r.probepos);
+                    return 0;
+                }
+            }
             memcpy(e, &r, sizeof(struct entry));
             break;
         } else {
@@ -244,10 +258,16 @@ static ssize_t internal_search(table_t t, void *key, size_t keylen)
     ssize_t pos = -1;
 
     for(;;) {
-        if((start + walk) <= ta->maxprobe) {
+        if(!topdone && (start + walk) <= ta->maxprobe) {
             pos = (hash + (start + walk) * step) % ta->size;
             e = &ta->table[pos];
-            if(e->alive) {
+            if(e->key == NULL) {
+                // We can exit early on top key being NULL
+                // in this case NOTHING has ever reached this
+                // node, including the currently sought probe-sequence
+                // meaning it either doesn't exist or lives below.
+                topdone = 1;
+            } else if(e->alive) {
                 if(!ta->cmp(key, e->key, keylen)) {
                     found = 1;
                     break;
@@ -257,7 +277,7 @@ static ssize_t internal_search(table_t t, void *key, size_t keylen)
             topdone = 1;
         }
 
-        if((start - walk) >= 1) {
+        if(!botdone && (start - walk) >= 1) {
             pos = (hash + (start - walk) * step) % ta->size;
             e = &ta->table[pos];
             if(e->alive) {
