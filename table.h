@@ -22,4 +22,7 @@ int table_iter(table_t, iter_func, void*);
 void *table_fetch_key(table_t, void *key, size_t keylen);
 void *table_fetch_val(table_t, void *key, size_t keylen);
 
+/* Diagnostics */
+void table_print_stats(table_t);
+
 #endif

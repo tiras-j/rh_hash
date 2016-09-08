@@ -9,7 +9,7 @@
 #include "table.h"
 
 #define TABLE_SIZE_DEFAULT 547
-#define TABLE_MAX_LOAD_FACTOR 0.9
+#define TABLE_MAX_LOAD_FACTOR 0.95
 
 #define MAX(a,b) \
     ({ __typeof__ (a) _a = (a); \
@@ -148,6 +148,14 @@ static int grow_table(table_t t)
     return 0;
 }
 
+void table_print_stats(table_t t)
+{
+    struct table *ta = t;
+    printf("Table Diagnostics\n");
+    printf("-----------------\n");
+    printf("Table Size: %lu, Elements %d, Load Factor: %f\n", ta->size, ta->elements, (float)ta->elements/(float)ta->size);
+    printf("Table Weight: %d, Average Probe: %d, Max Probe: %d\n", ta->totalweight, ta->totalweight/ta->elements, ta->maxprobe);
+}
 /* table_new generates a new table at the default size
  * it takes optionally a hashing function and a compare
  * function. By default it uses string keys and double hashing
@@ -217,6 +225,7 @@ int table_insert(table_t t, void *key, size_t keylen, void *data)
                     memcpy(e, &r, sizeof(struct entry));
                     ta->table[pos].alive = 0;
                     ta->totalweight -= ta->table[pos].probepos;
+                    // Exit without updating elements/maxprobe.
                     return 0;
                 }
             }
@@ -235,8 +244,9 @@ int table_insert(table_t t, void *key, size_t keylen, void *data)
             } else if(e->probepos == r.probepos && r.hash == e->hash && !strncmp(r.key, e->key, r.keylen)) {
                 // The key already exists, simply update the value
                 e->data = r.data;
-                // Exit early because in this case we don't want to 
-                // update the element count or maxprobe
+                // Update the totalweight since we didn't actually add anything
+                ta->totalweight -= r.probepos;
+                // Exit eithout updating elements/maxprobe
                 return 0;
             }
         }
@@ -254,8 +264,13 @@ static ssize_t internal_search(table_t t, void *key, size_t keylen)
     struct entry *e = NULL;
     unsigned long hash = ta->hash(key, keylen);
     unsigned long step = ta->step_prime - (hash % ta->step_prime);
-    int found = 0, walk = 0, start = ta->totalweight/ta->elements, topdone = 0, botdone = 0;
+    int found = 0, walk = 0, start = 0, topdone = 0, botdone = 0;
     ssize_t pos = -1;
+
+    if(ta->elements == 0)
+        return -1;
+
+    start = ta->totalweight/ta->elements;
 
     for(;;) {
         if(!topdone && (start + walk) <= ta->maxprobe) {
@@ -325,6 +340,8 @@ int table_remove(table_t t, void *key, size_t keylen)
 
     if(pos > 0) {
         ta->table[pos].alive = 0;
+        ta->elements--;
+        ta->totalweight -= ta->table[pos].probepos;
         return 0;
     } else {
         return -1;
